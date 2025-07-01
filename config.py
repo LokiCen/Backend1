@@ -6,7 +6,7 @@ from flask_jwt_extended import JWTManager  # 导入 JWTManager 用于 JWT 处理
 app = Flask(__name__)
 
 # 数据库配置
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:111111xiaomc@127.0.0.1:3306/T2i_system'  # 设置数据库 URI
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:password@127.0.0.1:3306/T2i_system'  # 设置数据库 URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 禁用修改跟踪以减少开销
 
 # JWT 配置
