@@ -16,5 +16,6 @@ class SearchHistory(db.Model):
             'date': self.date,  # 检索时间
             'search_type': self.search_type,  # 检索类型：0为文本检索，1为图片检索
             'search_text': self.search_text,  # 检索文本
-            'search_pictur': self.search_pictur  # 检索图片路径
+            'search_pictur': self.search_pictur,  # 检索图片路径
+            'model_choice': self.model_choice  # 模型选择：0为本地模型，1为大模型
         }

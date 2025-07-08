@@ -1,9 +1,28 @@
-from datetime import timedelta  # 导入 timedelta 用于设置 token 过期时间
-from flask import jsonify, request  # 导入 jsonify 用于返回 JSON 响应, request 用于获取请求数据
-from flask_jwt_extended import create_access_token, get_jwt_identity  # 导入 JWT 相关方法
+from datetime import timedelta, datetime
+from flask import jsonify, request
+from flask_jwt_extended import create_access_token, get_jwt_identity
 from config import db_init as db
-from zhipuai import ZhipuAI # 导入ZhipuAI用于用户对话
-from datetime import datetime  # 导入 datetime 用于时间处理
+from zhipuai import ZhipuAI
+import bcrypt
+from Crypto.Cipher import AES
+import base64
+import os
+
+# AES解密配置
+AES_KEY = os.getenv('AES_KEY', 'your-secret-key-123').encode('utf-8')
+IV = os.getenv('AES_IV', 'initial-vector-123').encode('utf-8')
+
+def decrypt_password(encrypted_password):
+    cipher = AES.new(AES_KEY, AES.MODE_CBC, IV)
+    decrypted = cipher.decrypt(base64.b64decode(encrypted_password))
+    return decrypted.rstrip(b'\0').decode('utf-8')
+
+def hash_password(password):
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt)
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 from models.smart_qa import smartQA # 导入 smartQA 模型
 from models.user import User  # 导入 User 模型
 import time  # 导入 time 用于生成订单号
@@ -31,8 +50,9 @@ def user_login(username, password):
             'data': None
         })
 
-    # 比较密码是否正确
-    if u.password != password:
+    # 解密并比较密码
+    decrypted_password = decrypt_password(password)
+    if not check_password(decrypted_password, u.password):
         return jsonify({
             'code': -2,
             'message': 'Incorrect password, please try again',
@@ -53,14 +73,13 @@ def user_login(username, password):
 
 
 # 用户注册函数
-def user_register(email, username, nickname, password):
+def user_register(email, username, password):
     """
     用户注册
 
     参数:
         email (str): 用户邮箱
         username (str): 用户名
-        nickname (str): 用户昵称
         password (str): 用户密码
 
     返回:
@@ -82,8 +101,10 @@ def user_register(email, username, nickname, password):
             'data': None
         })
 
-    # 创建新的用户对象
-    new_user = User(email=email, username=username, nickname=nickname, password=password, delete_flag=0, permission_level=1)
+    # 解密并哈希密码后创建用户
+    decrypted_password = decrypt_password(password)
+    hashed_password = hash_password(decrypted_password)
+    new_user = User(email=email, username=username, password=hashed_password.decode('utf-8'), delete_flag=0, permission_level=1)
 
     try:
         db.session.add(new_user)  # 添加新用户到数据库会话
@@ -122,7 +143,9 @@ def user_reset_password(username, password):
             'data': None
         })
 
-    u.password = password
+    # 解密并哈希新密码
+    decrypted_password = decrypt_password(password)
+    u.password = hash_password(decrypted_password).decode('utf-8')
 
     try:
         db.session.commit()  # 提交数据库会话
@@ -263,163 +286,7 @@ def user_delete(username, password):
         })
 
 
-# 获取用户余额函数
-def get_user_balance():
-    """
-    获取用户余额
 
-    返回:
-        JSON 响应: 包含用户余额的 JSON 对象
-    """
-    current_user_id = get_jwt_identity().get('user_id')  # 获取当前用户ID
-    u = User.query.filter_by(id=current_user_id, delete_flag=0).first()
-    if not u:
-        return jsonify({
-            'code': -1,
-            'message': 'User does not exist',
-            'data': None
-        })
-    return jsonify({
-        'code': 0,
-        'message': 'User balance retrieved successfully',
-        'data': u.to_dict().get('balance')
-    })
-
-
-# 更改用户余额函数
-def set_user_balance(money):
-    """
-    更改用户余额
-
-    参数:
-        money (float): 要扣除的金额
-
-    返回:
-        JSON 响应: 包含更改余额结果的 JSON 对象
-    """
-    current_user_id = get_jwt_identity().get('user_id')  # 获取当前用户ID
-    u = User.query.filter_by(id=current_user_id, delete_flag=0).first()
-    if not u:
-        return jsonify({
-            'code': -1,
-            'message': 'User does not exist',
-            'data': None
-        })
-    user_balance = u.to_dict().get('balance', 0)
-    if float(user_balance) < float(money):
-        return jsonify({
-            'code': -9,
-            'message': 'Insufficient user balance',
-            'data': None
-        })
-    # 扣除余额
-    u.balance = user_balance - float(money)
-
-    try:
-        # 提交更改到数据库
-        db.session.commit()
-        return jsonify({
-            'code': 0,
-            'message': 'Balance deduction successful',
-            'data': u.to_dict().get('balance')
-        })
-    except Exception as e:
-        # 如果发生错误，回滚更改
-        db.session.rollback()
-        return jsonify({
-            'code': -10,
-            'message': 'Database update failed',
-            'data': str(e)
-        })
-
-
-# 用户充值函数
-def user_charge(username, balance):
-    """
-    用户充值
-
-    参数:
-        username (str): 用户名
-        balance (float): 充值金额
-
-    返回:
-        JSON 响应: 包含充值结果的 JSON 对象
-    """
-    # 检查是否获取到所有必要的参数
-    if not username or not balance:
-        return jsonify({
-            'code': -1,
-            'message': 'Missing required parameters',
-            'data': None
-        })
-
-    try:
-        balance = float(balance)  # 将 balance 转换为浮点数
-        balance = round(balance, 2)  # 保证金额精确到小数点后两位
-    except ValueError:
-        return jsonify({
-            'code': -1,
-            'message': 'Invalid balance format',
-            'data': None
-        })
-
-    # 检查 balance 是否为正数
-    if balance <= 0:
-        return jsonify({
-            'code': -2,
-            'message': 'Recharge amount must be greater than zero',
-            'data': None
-        })
-
-    # 查询用户是否存在
-    u = User.query.filter_by(username=username, delete_flag=0).first()
-    if not u:
-        return jsonify({
-            'code': -3,
-            'message': 'User does not exist',
-            'data': None
-        })
-
-    # 生成唯一订单号
-    out_trade_no = f"order_{u.id}_{int(time.time())}"
-
-    return jsonify({
-        'code': 0,
-        'message': 'Payment order generated successfully',
-        'data': None
-    })
-
-# 用户对话函数
-def user_dialog(content):
-    client = ZhipuAI(api_key="b8700985ecb3c6e4f1a0fb5b242400a6.5IrNvh1kcywfQnYr")  # 请填写您自己的APIKey
-    response = client.chat.completions.create(
-        model="glm-4-0520",  # 填写需要调用的模型编码
-        messages=[
-            {"role": "user", "content": content},
-        ],
-        stream=True,
-    )
-
-    full_response = ""  # 初始化空字符串来拼接所有content
-    for chunk in response:
-        full_response += chunk.choices[0].delta.content  # 累加拼接content
-
-    # 记录检索历史
-    current_user_id = get_jwt_identity().get('user_id')
-    new_smartQA = smartQA(
-        user_id=int(current_user_id),
-        question=content,
-        answer=full_response,
-        date=datetime.now(),
-    )
-    db.session.add(new_smartQA)
-    db.session.commit()
-
-    return jsonify({
-        'code': 0,
-        'message': full_response,
-        'data': None
-    })
 
 # 用户下载图片函数
 def user_download_picture(filename, format, resolution):

@@ -1,4 +1,4 @@
-from flask import Flask  # 导入 Flask 模块用于创建应用
+from flask import Flask, jsonify  # 导入 Flask 和 jsonify 模块
 from flask_cors import CORS  # 导入 CORS 模块用于处理跨域请求
 from routes.user import user  # 导入用户蓝图
 from routes.search_history import search_history  # 导入检索历史蓝图
@@ -18,11 +18,16 @@ with app.app_context():
 # 启用跨域资源共享（CORS）配置
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3030"],
+    "origins": ["http://10.242.6.160:3030"],  # 允许前端IP访问
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
+
+# 测试路由
+@app.route('/test')
+def test():
+    return jsonify({"status": "success", "message": "Backend connected"})
 
 if __name__ == '__main__':
     # 启动 Flask 应用

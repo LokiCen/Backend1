@@ -21,7 +21,7 @@ def search_text():
         })
 
     keywords = data.get('keywords')
-
+    choice_generate = data.get('choice', '0')
     # 检查必填字段
     if not keywords:
         return jsonify({
@@ -31,7 +31,7 @@ def search_text():
         })
 
     # 调用文本检索服务
-    return text_search(keywords)
+    return text_search(keywords,choice_generate)
 
 # 图片检索路由
 @search.route('/image', methods=['POST'])
@@ -48,6 +48,6 @@ def search_image():
         })
 
     image_file = request.files['image_file']
-
+    prompt = request.form.get('description') 
     # 调用图片检索服务
-    return image_search(image_file)
+    return image_search(image_file,prompt)

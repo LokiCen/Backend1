@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify # 导入 Flask Blueprint、request
 from flask_jwt_extended import jwt_required  # 导入 JWT 认证所需的装饰器
 from services.user import (
     user_login, user_register, user_edit, user_delete,
-    get_user_balance, set_user_balance, user_charge, user_download_picture, user_dialog, user_reset_password
+  user_download_picture, user_reset_password
 )  # 导入用户相关服务
 from services.feedback_suggestion import feedback_submission, feedback_history  # 导入反馈建议相关服务
 from file_upload import handle_file_upload  # 导入文件上传处理函数

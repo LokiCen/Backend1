@@ -10,7 +10,7 @@ from services.search import UPLOAD_FOLDER, read_and_encode_image
 
 
 # 记录检索历史服务函数(一组)
-def record_search_history(user_id, search_type, search_text_list, search_pictur_list):
+def record_search_history(user_id, search_type, search_text_list, search_pictur_list, model_choice=0):
     """
         记录检索历史
 
@@ -39,12 +39,21 @@ def record_search_history(user_id, search_type, search_text_list, search_pictur_
     search_date = datetime.now()
 
     # 创建新的检索历史对象
+    # 验证model_choice参数
+    if model_choice not in [0, 1]:
+        return jsonify({
+            'code': -3,
+            'message': 'Model choice must be 0 (local model) or 1 (large model)',
+            'data': None
+        })
+
     new_history = SearchHistory(
         user_id=user_id,
         date=search_date,
-        search_type=search_type,  # 布尔值存储，1 表示图片检索为 True
+        search_type=search_type,
         search_text=search_text,
-        search_pictur=search_pictur
+        search_pictur=search_pictur,
+        model_choice=model_choice
     )
 
     try:

@@ -14,5 +14,6 @@ class Text(db.Model):
             'id': self.id,  # 文本ID
             'title': self.title,  # 文本标题
             'content': self.content,  # 文本内容
-            'source': self.source  # 文本来源（可选）
+            'source': self.source,  # 文本来源（可选）
+            'choice':self.choice #是否调用API生成：0,1
         }
